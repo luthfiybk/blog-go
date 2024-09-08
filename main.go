@@ -17,6 +17,7 @@ func main() {
 	r := gin.Default()
 
 	routes.PostRouter(r)
+	routes.UserRoutes(r)
 
 	r.Run(":5000")
 }

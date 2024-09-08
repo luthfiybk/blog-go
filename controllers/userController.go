@@ -3,8 +3,12 @@ package controllers
 import (
 	"blog-go/inits"
 	"blog-go/models"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -95,4 +99,70 @@ func Login(ctx *gin.Context){
 		return
 	}
 
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id": user.ID,
+		"exp": time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(os.Getenv("SECRET")))
+
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"statusCode": 500,
+			"message":    "Failed to generate token!",
+			"error":      err,
+		})
+		return
+	}
+
+	ctx.SetSameSite(http.SameSiteLaxMode)
+	ctx.SetCookie("Authorization", tokenString, 3600*24, "", "localhost", false, true)
+}
+
+func GetUsers(ctx *gin.Context) {
+	var users []models.User
+
+	err := inits.DB.Model(&models.User{}).Preload("Posts").Find(&users).Error
+
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"statusCode": 500,
+			"message":    "Failed to fetch users!",
+			"error":      err,
+		})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"statusCode": 200,
+		"message":    "Users fetched successfully!",
+		"data":       users,
+	})
+}
+
+func Validate(ctx *gin.Context) {
+	user, err := ctx.Get("user")
+
+	if err != false {
+		ctx.JSON(401, gin.H{
+			"statusCode": 401,
+			"message":    "User is not authenticated!",
+		})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"statusCode": 200,
+		"message":    "User is authenticated!",
+		"data":       user,
+	})
+}
+
+func Logout(ctx *gin.Context) {
+	ctx.SetSameSite(http.SameSiteLaxMode)
+	ctx.SetCookie("Authorization", "", -1, "", "localhost", false, true)
+	ctx.JSON(200, gin.H{
+		"statusCode": 200,
+		"message":    "User logged out successfully!",
+	})
 }
